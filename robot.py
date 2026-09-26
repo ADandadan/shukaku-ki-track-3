@@ -60,13 +60,24 @@ def get_frame_client(host: str):
 
 
 def _as_intrinsics(value) -> CameraIntrinsics:
-    if isinstance(value, CameraIntrinsics):
-        return value
-    if isinstance(value, dict):
-        return CameraIntrinsics(**{key: float(value[key]) for key in ("fx", "fy", "cx", "cy")})
-    return CameraIntrinsics(
-        fx=float(value.fx), fy=float(value.fy), cx=float(value.cx), cy=float(value.cy)
-    )
+    try:
+        if isinstance(value, CameraIntrinsics):
+            intrinsics = value
+        elif isinstance(value, dict):
+            intrinsics = CameraIntrinsics(
+                **{key: float(value[key]) for key in ("fx", "fy", "cx", "cy")}
+            )
+        else:
+            intrinsics = CameraIntrinsics(
+                fx=float(value.fx), fy=float(value.fy), cx=float(value.cx), cy=float(value.cy)
+            )
+    except (AttributeError, KeyError, TypeError, ValueError) as error:
+        raise ValueError("camera intrinsics must expose finite fx, fy, cx, and cy") from error
+    if not all(np.isfinite(item) for item in vars(intrinsics).values()):
+        raise ValueError("camera intrinsics must contain finite values")
+    if intrinsics.fx <= 0 or intrinsics.fy <= 0:
+        raise ValueError("camera focal lengths must be positive")
+    return intrinsics
 
 
 def _make_picker(args) -> OkraPicker:
@@ -157,6 +168,15 @@ def main():
             frame, depth_m, capture_ts = client.get_aligned_frame()
             if frame is None or depth_m is None or capture_ts is None:
                 continue
+            depth_m = np.asarray(depth_m)
+            if depth_m.ndim != 2:
+                raise ValueError("camera depth must be a 2D array in meters")
+            if getattr(frame, "shape", None) is None or frame.shape[:2] != depth_m.shape:
+                raise ValueError("camera RGB and aligned depth dimensions must match")
+            try:
+                capture_ts = float(capture_ts)
+            except (TypeError, ValueError) as error:
+                raise ValueError("camera capture timestamp must be Unix seconds") from error
 
             results = model.predict(
                 source=frame, imgsz=640, conf=args.confidence, verbose=False

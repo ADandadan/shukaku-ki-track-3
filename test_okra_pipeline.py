@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from robot import _as_intrinsics
 from okra_pipeline import (
     CameraIntrinsics,
     Detection,
@@ -21,6 +22,18 @@ def test_median_depth_ignores_invalid_neighbors():
 def test_unproject_center_pixel():
     point = unproject_pixel(320, 240, 2.0, CameraIntrinsics(500, 500, 320, 240))
     np.testing.assert_allclose(point, [0, 0, 2])
+
+
+def test_intrinsics_reject_nonpositive_focal_length():
+    with pytest.raises(ValueError, match="focal lengths"):
+        _as_intrinsics({"fx": 0, "fy": 500, "cx": 320, "cy": 240})
+
+
+def test_intrinsics_accept_attribute_object():
+    class Intrinsics:
+        fx, fy, cx, cy = 500, 500, 320, 240
+
+    assert _as_intrinsics(Intrinsics()) == CameraIntrinsics(500, 500, 320, 240)
 
 
 def test_transform_point_applies_translation():

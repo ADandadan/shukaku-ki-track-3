@@ -6,6 +6,24 @@ Detect okra from an RGB-D camera, estimate its position in the G1 body frame, an
 
 The user currently has no robot access. Do not attempt SSH, connect to the robot, or run hardware tests unless the user later confirms access and explicitly requests them.
 
+## Deferred SSH Access
+
+When the user has the robot physically available and explicitly authorizes access:
+
+1. Connect the external development PC to the G1 LAN port with a wired Ethernet cable.
+2. Confirm the robot is in the appropriate development mode and that the PC is on the robot network.
+3. From the external PC, connect to the internal PC:
+
+   ```bash
+   ssh unitree@192.168.123.164
+   ```
+
+4. Enter the robot's configured SSH password when prompted. Do not store the password in this repository, scripts, environment files, or chat logs.
+5. Use SSH for inspection and deployment diagnostics only. Do not install new software on the internal PC or modify its existing programs.
+6. Exit the session with `exit` when inspection is complete.
+
+Do not run this command, probe the address, or perform any robot-side checks until the user confirms that robot access is available and requests the operation. Run the okra application from the external PC; SSH is not required for the normal application path.
+
 ## Current Implementation
 
 - `okra_pipeline.py` extracts segmentation-mask centroids, selects detections, filters depth samples, unprojects pixels, transforms points, checks confidence/freshness/range, loads local weights first, and supports image-only dry runs.
