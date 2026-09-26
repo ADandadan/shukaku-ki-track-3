@@ -155,10 +155,15 @@ def safety_check(
 
 
 def _load_model(repo_id: str, filename: str) -> Any:
-    from huggingface_hub import hf_hub_download
     from ultralytics import YOLO
 
-    weights = hf_hub_download(repo_id=repo_id, filename=filename)
+    local_weights = Path(filename).expanduser()
+    if local_weights.is_file():
+        weights = str(local_weights)
+    else:
+        from huggingface_hub import hf_hub_download
+
+        weights = hf_hub_download(repo_id=repo_id, filename=filename)
     return YOLO(weights)
 
 

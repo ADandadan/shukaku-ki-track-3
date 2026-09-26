@@ -10,6 +10,7 @@ from okra_pipeline import (
     transform_point,
     unproject_pixel,
 )
+from movement import OkraPicker, PickConfig, PickerState
 
 
 def test_median_depth_ignores_invalid_neighbors():
@@ -38,3 +39,73 @@ def test_safety_check_rejects_stale_frame():
     )
     assert not ok
     assert reason == "stale frame"
+
+
+def test_picker_rejects_stale_frame_without_motion():
+    calls = []
+
+    class Backend:
+        def move_to_pose(self, target_se3, *, duration_s):
+            calls.append("move")
+
+        def set_gripper(self, *, open_amount):
+            calls.append("gripper")
+
+    picker = OkraPicker(Backend(), sleep=lambda _: None)
+    ok, reason = picker.pick(
+        [0, 0, 0.4], Detection(10, 10, 0.9, 100, 0), frame_age_s=1.0
+    )
+
+    assert not ok
+    assert reason == "stale frame"
+    assert calls == []
+    assert picker.state is PickerState.SEARCH
+
+
+def test_picker_requires_calibrated_rotation():
+    calls = []
+
+    class Backend:
+        def move_to_pose(self, target_se3, *, duration_s):
+            calls.append("move")
+
+        def set_gripper(self, *, open_amount):
+            calls.append("gripper")
+
+    picker = OkraPicker(Backend(), sleep=lambda _: None)
+    ok, reason = picker.pick(
+        [0, 0, 0.4], Detection(10, 10, 0.9, 100, 0), frame_age_s=0.01
+    )
+
+    assert not ok
+    assert reason == "grasp rotation is not calibrated"
+    assert calls == []
+
+
+def test_picker_runs_open_approach_grasp_close_retreat():
+    calls = []
+
+    class Backend:
+        def move_to_pose(self, target_se3, *, duration_s):
+            calls.append(("move", duration_s))
+
+        def set_gripper(self, *, open_amount):
+            calls.append(("gripper", open_amount))
+
+    rotation = ((1, 0, 0), (0, 1, 0), (0, 0, 1))
+    picker = OkraPicker(
+        Backend(), PickConfig(grasp_rotation=rotation), sleep=lambda _: None
+    )
+    ok, reason = picker.pick(
+        [0, 0, 0.4], Detection(10, 10, 0.9, 100, 0), frame_age_s=0.01
+    )
+
+    assert ok, reason
+    assert calls == [
+        ("gripper", 1.0),
+        ("move", picker.config.approach_duration_s),
+        ("move", picker.config.grasp_duration_s),
+        ("gripper", 0.0),
+        ("move", picker.config.retreat_duration_s),
+    ]
+    assert picker.state is PickerState.SEARCH
