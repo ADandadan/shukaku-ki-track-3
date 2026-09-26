@@ -7,9 +7,11 @@ weights = hf_hub_download(
     repo_id="Kota0612/okra11n-seg-v5",
     filename="output/okra_finetune_v5/weights/best.pt",
 )
+#model = YOLO("best.pt")
 model = YOLO(weights)
 
-results = model.predict(source="image.png", imgsz=640, conf=0.25)
+#results = model.predict(source="imagex.png", imgsz=640, conf=0.25)
+results = model.predict(source="image.png", conf=0.4)
 
 for r in results:
     if r.masks is not None:
